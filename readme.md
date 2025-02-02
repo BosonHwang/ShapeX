@@ -1,3 +1,0 @@
-# The repository  of ShapeX
-
-🚀
