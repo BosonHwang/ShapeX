@@ -62,7 +62,7 @@ from scipy.signal import find_peaks
 from utils_training import EarlyStopping,plot_visualize_some,find_project_root
 from get_data import get_saliency_data
 
-from PatchTST_supervised.models import ProtoPTST
+from shapelet_encoder.models import ProtoPTST
 
 
 

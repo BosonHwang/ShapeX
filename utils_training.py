@@ -1,5 +1,5 @@
 import torch
-from PatchTST_supervised.models import ProtoPTST
+from shapelet_encoder.models import ProtoPTST
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import numpy as np
