@@ -9,9 +9,6 @@ ShapeX, an innovative framework that segments time series into meaningful shapel
 ## Installation 🛠️
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/ShapeX.git
-cd ShapeX
 
 # Install dependencies
 pip install -r requirements.txt
