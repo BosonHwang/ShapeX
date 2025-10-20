@@ -1,7 +1,7 @@
 
 #from get_attention_model import get_model
 
-from get_pretrain_model import get_pretrain_model,get_model
+#from his.get_pretrain_model import get_pretrain_model,get_model
 import torch
 import numpy as np
 #from maskCut_TS import *
@@ -9,85 +9,51 @@ import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
+
 DISTANCE = 10   
-def step_waveform(series,ratio=1):
-    # 平滑处理, series : T
-    if not torch.is_tensor(series):
-        series = torch.tensor(series)
-    
-    threshold=torch.mean(series)*ratio
-    
-    smoothed = np.convolve(series, np.ones(5)/5, mode='same')
-    
-    # 阈值化
-    stepped = np.where(smoothed > threshold.numpy(), 1, 0)
-    
-    return stepped
-
-
-def step_waveform_his(series,ratio=1):
-    # 平滑处理, series : T
-    
-    threshold=torch.mean(series)*ratio
-    
-    smoothed = np.convolve(series, np.ones(5)/5, mode='same')
-    
-    # 阈值化
-    stepped = np.where(smoothed > threshold.numpy(), 1, 0)
-    
-    return stepped
 
 
 def moving_average_centered(time_series, window_size):
     """
-    中心滑动平均：窗口中心对齐
+    Centered moving average: window centered alignment.
     """
     padded_series = np.pad(time_series, (window_size // 2, window_size // 2), mode='edge')
     return np.convolve(padded_series, np.ones(window_size), 'valid') / window_size
 
 
-def moving_average_right(time_series, window_size):
-    """
-    向右滑动平均：窗口向右对齐
-    """
-    padded_series = np.pad(time_series, (0, window_size - 1), mode='edge')
-    return np.convolve(padded_series, np.ones(window_size), 'valid') / window_size
-
-
 def fill_short_negative_sequences(time_series, threshold=7):
     """
-    将长度小于 threshold 的负值子序列填充为 1。
+    Fill negative subsequences shorter than `threshold` with value 1.
     
-    参数:
-    - time_series: numpy 数组，表示时间序列
-    - threshold: 小于该长度的负值子序列将被填充为 1，默认为 5
+    Args:
+        time_series (np.ndarray): Input time series.
+        threshold (int): Negative subsequences shorter than this will be filled to 1.
     
-    返回:
-    - 填充后的时间序列
+    Returns:
+        np.ndarray: The modified time series.
     """
-    # 创建一个副本来保存填充后的结果
-    
+    # Create an offset view to help detect negatives
     filled_series = time_series-1
     
-    # 用于记录负值子序列的开始和结束位置
+    # Track start of negative subsequence
     start = None
     
     for i, value in enumerate(filled_series):
         if value < 0:
-            # 如果检测到负值，记录开始位置
+            # Found a negative value: record start if not set
             if start is None:
                 start = i
         else:
-            # 如果检测到非负值，且之前记录了负值子序列的开始位置
+            # Transition to non-negative and we had a running negative subsequence
             if start is not None:
-                end = i  # 当前索引就是子序列的结束位置
-                length = end - start  # 计算负值子序列的长度
+                end = i  # end position (exclusive)
+                length = end - start  # length of the negative subsequence
                 
-                # 如果负值子序列长度小于阈值，则将其填充为 1
+                # If shorter than threshold, fill to 1 (set to 2 before later offset)
                 if length < threshold:
                     time_series[start:end] = 2
                 
-                # 重置开始位置
+                # Reset start tracker
                 start = None
     
     
@@ -96,37 +62,18 @@ def fill_short_negative_sequences(time_series, threshold=7):
 
 def interpolate_tensor(input_tensor,new_T=480,dim_to_change=0):
 
-    # 需要先交换维度，将 T 维度放在最后，方便使用 interpolate
+    # Swap dims to move T to the last position for interpolate
     last_dim=len(input_tensor.shape)-1
-    input_tensor = input_tensor.transpose(dim_to_change,last_dim)  # 现在形状变为 (batch_size, D, T)
+    input_tensor = input_tensor.transpose(dim_to_change,last_dim)  # Now (batch_size, D, T)
 
-    # 使用 interpolate 函数
+    # Use interpolate
     output_tensor = torch.nn.functional.interpolate(input_tensor, size=new_T, mode='linear', align_corners=True)
     print(output_tensor.shape)
 
-    # 再次交换维度，将 D 维度放回到最后
-    output_tensor = output_tensor.transpose(dim_to_change,last_dim)  # 现在形状变为 (batch_size, new_T, D)
+    # Swap dims back
+    output_tensor = output_tensor.transpose(dim_to_change,last_dim)  # Now (batch_size, new_T, D)
 
     return output_tensor
-
-
-def segment_sequence(a):
-    segments = []
-    start = None
-    current_value = None
-
-    for i in range(len(a)):
-        if a[i] != current_value:  # 当值发生变化时
-            if start is not None:
-                segments.append((start, i - 1))  # 记录结束索引
-            start = i  # 记录新的起始索引
-            current_value = a[i]  # 更新当前值
-
-    # 处理序列结尾仍然是相同值的情况
-    if start is not None:
-        segments.append((start, len(a) - 1))
-
-    return segments
 
 
 def segment_sequence_ones(a):
@@ -160,122 +107,6 @@ def segment_sequence_ones(a):
     torch.cuda.empty_cache()
 
     return segments
-
-
-def segment_sequence_ones_with_max_indicator(a, T):
-    """
-    Segments a sequence based on consecutive '1' values, only retaining the segment
-    that includes the maximum value from an indicator sequence T.
-    
-    Parameters:
-    - a (list): The input list or sequence to segment.
-    - T (list): The indicator sequence, where we find the maximum value.
-
-    Returns:
-    - selected_segment (tuple): A tuple containing the start and end indices 
-      of the segment where the value is '1' and includes the maximum value from T.
-      Returns None if no such segment is found.
-    """
-    segments = []
-    start = None
-
-    # Find the index of the maximum value in T
-    max_index = torch.argmax(T).item()
-
-    # Segment based on consecutive '1's in 'a'
-    for i in range(len(a)):
-        if a[i] == 1:
-            if start is None:
-                start = i  # Start a new segment
-        else:
-            if start is not None:
-                segments.append((start, i - 1))  # End the current segment
-                start = None  # Reset start
-
-    # Handle the case where the sequence ends with a segment of '1's
-    if start is not None:
-        segments.append((start, len(a) - 1))
-
-    # Find the segment that includes the max_index
-    for segment in segments:
-        if segment[0] <= max_index <= segment[1]:
-            return [segment]
-
-    return None  # Return None if no segment includes max_index
-
-
-
-def get_seg_pretrain(signal,class_model = None,#get_pretrain_model("freqshape_274"),
-                      class_model_seq_len=1400,class_model_channel=1,
-                      
-                      moving_average_window=8,
-                      return_attention=True, step_attention=True):
-    # signal.shape: tensor, [T], 
-    
-    sig_dim=signal.shape[0]
-    device=next(class_model.parameters()).device
-    class_model.to(device)
-    
-    ### one for seqcomb dataset
-    signal=signal+2
-    print("@@@@@@@@@@@@@@@@@@@@@")
-    
-    batch_x=signal.reshape(1,-1,1)
-    #batch_x=torch.abs(batch_x)
-    #batch_x=torch.tensor(np.square(np.square(torch.abs(batch_x)))) #!!!
-    
-    # change to APAVA size:
-    
-    batch_x= batch_x.expand(-1, sig_dim, class_model_channel)
-    #batch_x=batch_x[:,:256,:]
-    batch_x=interpolate_tensor(batch_x,class_model_seq_len,1) # 
-    
-    
-    
-    # get pretrain model outout:
-    atten_slice=class_model(batch_x)
-    atten_slice=atten_slice.reshape(-1).tolist()
-  
-    
-    ## add layer and head 
-    
-  
-    atten_slice=(atten_slice/np.max(atten_slice)) #### !!!
-    
-    if step_attention:
-        print("step_attentionstep_attentionstep_attentionstep_attention")
-        atten_slice_steped=torch.tensor(step_waveform(atten_slice,1),dtype=torch.float16)
-        
-    
-    # change length
-    feats=torch.tensor(atten_slice).reshape(-1,1,1)
-    feats=interpolate_tensor(feats,sig_dim,0).reshape(-1,1)
-    
-    
-    # get bipartitions by maskCut
-    
-    # to be implemented:
-    maskcut_forward_TS=None
-    bipartitions, A= maskcut_forward_TS(feats,feats.shape[0],1,sig_dim,0,1,device)
-    bipartition_0=bipartitions[0].astype(int)
-    
-    #bipartition_list.append(bipartition_0)
-    #atten_slice_list.append(atten_slice)
-    
-    # return some inter vector
-    #seg=segment_sequence(bipartition_0)
-    seg=segment_sequence(atten_slice_steped.tolist())
-    return_atten_slice=interpolate_tensor(torch.tensor(atten_slice).reshape(-1,1,1),sig_dim,0).reshape(-1)
-    return_bipartition_0=torch.tensor(bipartition_0,dtype=torch.float16)
-    
-    print("return_atten_slice!!!!!!:",return_atten_slice.shape)
-    
-    if return_attention:
-        return seg, atten_slice_steped
-    else:
-        return seg
-
-
 
 
 
@@ -319,7 +150,8 @@ def get_seg_ProtopTST(signal ,seg_model): # for ECG dataset
     return segs , actions_sum
 
 
-def get_seg_ProtopTST_SNC(signal,seg_model): # for SNC dataset
+
+def get_seg_ProtopTST_SNC(signal,seg_model): # for mcce,mcch,mtce,mtch dataset
     """
     signal: [seq_len,dim]
     
@@ -359,23 +191,39 @@ def get_seg_ProtopTST_SNC(signal,seg_model): # for SNC dataset
 
 
 
+def get_seg_unified(signal, seg_model, dataset_name):
+    """
+    Unified segmentation wrapper that dispatches by dataset name and
+    standardizes the return types.
+
+    Returns:
+        segs: list of (start_idx, end_idx)
+        actions_sum: torch.Tensor of shape [T]
+    """
+    name = (dataset_name or "").lower() if isinstance(dataset_name, str) else ""
+    if (name == "mitecg") or ("ecg" in name):
+        segs, actions_sum = get_seg_ProtopTST(signal, seg_model)
+    else:
+        segs, actions_sum = get_seg_ProtopTST_SNC(signal, seg_model)
+
+    # Normalize actions_sum to torch tensor (device follows input signal)
+    if isinstance(actions_sum, np.ndarray):
+        actions_sum = torch.tensor(
+            actions_sum,
+            dtype=signal.dtype,
+            device=signal.device if hasattr(signal, 'device') else None,
+        )
+    return segs, actions_sum
 
 
 
-class ShapeX:
-    def __init__(self) -> None:
-        pass
-    
-    def get_attention_model(self):
-        self.attention_model=Atention_model
-        
 def get_equal_segments(seq_len, seg_length):
     segments = []
     start = 0
     while start < seq_len:
-        end = min(start + seg_length, seq_len)  # 确保不超过序列长度
-        segments.append([start, end - 1])  # 索引从 0 开始，因此 end - 1
-        start = end  # 下一个段的起始索引
+        end = min(start + seg_length, seq_len)  # ensure not exceeding sequence length
+        segments.append([start, end - 1])  # indices are 0-based, so end - 1
+        start = end  # advance to next segment start
     return segments       
 
     
@@ -387,70 +235,31 @@ class ScoreSubsequences(object):
         
         self.seq_method=seq_method
         self.seg_model=seg_model
-        self.device=args.device
         self.args=args
         
         self.equal_seg_len = args.equal_seg_len
+        self.device=args.device
         
 
-    def get_subsequence_peaks_and_valleys(self,y, smoothing_window=5, distance=DISTANCE): ####################### 
-
-    #参数:
-   
-    #- smoothing_window: 平滑窗口大小
-    #- distance: 用于找到波峰和波谷的最小距离
-
-    # Step 1: 平滑处理
-       
-        print("Yyyyyyyyyyyy:", y.shape)
-        def smooth(y, window_len=11):
-            window = np.ones(window_len) / window_len
-            return np.convolve(y, window, mode='same')
-    
-        if AD:
-            y = get_TranAD_y(y)[:,1]
-            
-        y=y.reshape(-1)
-        y_smooth=y
-        #y_smooth = smooth(y, window_len=smoothing_window)
-    
-    # Step 2: 寻找波峰和波谷
-        #peaks, _ = find_peaks(y_smooth, distance=distance)
-        valleys, _ = find_peaks(-y_smooth, distance=distance)
-    
-    # Step 3: 根据波峰和波谷划分子序列
-        split_points = np.sort( valleys)
-    
-        sub_sequences = []
-        start_idx = 0
-        for idx in split_points:
-            sub_sequences.append((start_idx, idx))
-            start_idx = idx + 1
-
-        if start_idx < len(y):
-            sub_sequences.append((start_idx, len(y) - 1))
-    
-        return sub_sequences
-    
     def normalize_scores(self,score_list):
         """
-        对分数列表进行归一化。
-        如果最大值为 0，则返回全零列表。
+        Normalize a list of scores.
+        If the maximum is 0, return all zeros.
 
         Args:
-            score_list (list of float): 原始分数列表。
+            score_list (list of float): Raw scores.
 
         Returns:
-            list of float: 归一化后的分数列表。
+            list of float: Normalized scores.
         """
-        if not score_list:  # 如果列表为空，返回空列表
+        if not score_list:  # empty input
             return []
         
-        max_score = max(score_list)  # 获取最大值
-        if max_score == 0:  # 如果最大值为 0，返回全零列表
+        max_score = max(score_list)  # max value
+        if max_score == 0:  # avoid divide-by-zero
             return [0 for _ in score_list]
         
-        # 正常归一化
+        # standard normalization
         return [score / max_score for score in score_list]
         
         
@@ -480,15 +289,8 @@ class ScoreSubsequences(object):
             
             seq_lst = get_equal_segments(signal.shape[0], self.args.equal_seg_len)
             
-        elif self.seq_method == "prototype":  ## for ECG data
-            #print("###################protype")
-            
-            if self.args.data=="mitecg":
-                seq_lst,actions_sum = get_seg_ProtopTST(signal,self.seg_model)
-                
-            else:
-            
-                seq_lst,actions_sum = get_seg_ProtopTST_SNC(signal,self.seg_model)
+        elif self.seq_method == "prototype":
+            seq_lst, actions_sum = get_seg_unified(signal, self.seg_model, getattr(self.args, 'data', None))
         
         else:
             print("!!!! seq_method error !!!")
@@ -503,10 +305,9 @@ class ScoreSubsequences(object):
         seq_lst=np.clip(seq_lst, None, self.seq_len-1)
         
         for i,(start_idx, end_idx)  in enumerate(seq_lst):
-            # 创建时间序列的副本，并将指定子序列置为零
+            # Create a copy and mask the target subsequence
             modified_series = signal.clone()
-            
-            
+
             
             #print("start_idx, end_idx:",start_idx, end_idx)
             
@@ -518,26 +319,34 @@ class ScoreSubsequences(object):
                 modified_series[start_idx:end_idx,:] = torch.mean(signal)
             
             else:
-                modified_series[start_idx:end_idx,:] =torch.from_numpy(np.linspace(modified_series[start_idx], modified_series[end_idx], end_idx - start_idx)) 
+                # previous numpy linspace implementation (< 2.0)
+                # Use pure PyTorch linear interpolation to avoid NumPy version issues
+                start_val = modified_series[start_idx]
+                end_val = modified_series[end_idx]
+                # Create interpolation weights
+                t = torch.linspace(0, 1, end_idx - start_idx, device=start_val.device, dtype=start_val.dtype)
+                # Linear interpolation: start_val * (1 - t) + end_val * t
+                interpolated = start_val * (1 - t.unsqueeze(-1)) + end_val * t.unsqueeze(-1)
+                modified_series[start_idx:end_idx,:] = interpolated 
             
             #sub_seq=#torch.mean(signal)  #torch.mean(signal)，0              ######### disturn data
             
             
-            # 对修改后的时间序列进行预测
+            # Predict on the modified series
             modified_prediction = self.get_classification(modified_series)
             
-            # 计算得分：原始预测与修改后预测的差值
+            # Compute score: difference between original and modified predictions
             score = (original_prediction - modified_prediction).abs().sum().item() ############ pay attention here !!!
             
             #score = score / (end_idx - start_idx+ 1) # !!!
             #score = score / (end_idx - start_idx+ 1) ** 3 # !!!
     
-            # 将得分加入列表
+            # Add to list
             score_list.append(score)
             
             modified_series_list.append(modified_series)
     
-        #max_score = max(score_list) if score_list else 1  # 防止出现全零的情况
+        #max_score = max(score_list) if score_list else 1  # prevent all-zeros case
         #normalized_scores = [score / max_score for score in score_list]  ### normalize 
         
         
@@ -573,71 +382,85 @@ class ScoreSubsequences(object):
         else :
             return score_vector 
         
- 
     
-    def get_score_as_GTEXP(self,X,place_hodler=False,only_max=False):
-        ## X:[T,sample,dim]
-        self.seq_len=X.shape[0]
-        print("X.shape:",X.shape)
-        
-        GT_EXP=torch.tensor([]).to(dtype=torch.float16)
-        
-        place_holder_list=[]
-        
-        sample_n=X.shape[1]
-        
-        with torch.no_grad(): # 减小计算资源占用
-            for i in tqdm(range(sample_n), desc="counting saliency score",position=0):
-                #print(i)
-                signal=X[:,i,:]
+    def get_score_as_GTEXP(self,X,if_place_hodler=False,only_max=False):
+        ## X:[N,T,dim] batch-first
+        self.seq_len = X.shape[1]
+        print("X.shape:", X.shape)
+
+        scores_list = []  # list of (T,1)
+        place_holder_list = []
+
+        sample_n = X.shape[0]
+
+        with torch.no_grad(): # reduce compute overhead
+            for i in tqdm(range(sample_n), desc="counting saliency score", position=0):
+                signal = X[i, :, :]  # (T,dim)
                 if only_max:
-                    score_vector,place_holder=self.get_score_vector_max(signal,i)
-                    
+                    score_vector, place_holder = self.get_score_vector_max(signal, i)
                 if self.args.seq_method == "equal_seg":
-                    score_vector=self.get_score_vector(signal,i)
-                    place_holder=[]
-                    
+                    score_vector = self.get_score_vector(signal, i)
+                    place_holder = []
                 else:
-                    score_vector,place_holder =self.get_score_vector(signal,i)#
-                #score_vector=self.get_score_vector(signal,i)
-                GT_EXP=torch.cat((GT_EXP, score_vector), dim=1).to(dtype=torch.float16)
-                
-                
+                    score_vector, place_holder = self.get_score_vector(signal, i)
+                    place_holder = place_holder.reshape(-1, 1)
+
+                    # Ensure place_holder is a PyTorch tensor
+                    if isinstance(place_holder, np.ndarray):
+                        place_holder = torch.from_numpy(place_holder).float()
+
+                    # normalize the place_holder using PyTorch to avoid NumPy version issues:
+                    place_holder = place_holder / torch.max(place_holder)
+
+                    T = score_vector.shape[0]
+                    if T < place_holder.shape[0]:
+                        place_holder = place_holder[:T]
+                    else: # pad using PyTorch to avoid NumPy version issues
+                        padding_size = T - place_holder.shape[0]
+                        place_holder = torch.cat([place_holder, torch.zeros(padding_size, 1, device=place_holder.device)], dim=0)
+
+                    # Ensure place_holder is on the same device as score_vector
+                    place_holder = place_holder.to(score_vector.device)
+                    score_vector = score_vector + 0.1 * place_holder
+
+                scores_list.append(score_vector.to(dtype=torch.float16))
                 place_holder_list.append(place_holder)
-                
-                torch.cuda.empty_cache() ## ！！！
-                
+
+                torch.cuda.empty_cache() ## !!!
+
                 del signal, score_vector, place_holder
-                torch.cuda.empty_cache() 
-                
-        
-        print("GT_EXP.shape:",GT_EXP.shape)
-        return GT_EXP #,place_holder_list
+                torch.cuda.empty_cache()
+
+        # stack to (N,T,1)
+        GT_EXP = torch.stack(scores_list, dim=0)
+        print("GT_EXP.shape:", GT_EXP.shape)
+        return GT_EXP
     
     
     def get_score_as_GTEXP_para(self, X, place_hodler=False, only_max=False):
         """
-        使用并行化计算 GT_EXP 显著性得分
+        Compute GT_EXP saliency scores in parallel.
         """
-        self.seq_len = X.shape[0]
-        sample_n = X.shape[1]
+        self.seq_len = X.shape[1]
+        sample_n = X.shape[0]
 
-        # 定义处理函数
+        # Define worker
         def process_sample(i):
-            signal = X[:, i, :]
+            signal = X[i, :, :]
             if only_max:
                 return self.get_score_vector_max(signal, i)
             else:
                 return self.get_score_vector(signal, i)
 
-        # 并行化处理
+        # Parallel processing
         results = Parallel(n_jobs=-1)(delayed(process_sample)(i) for i in tqdm(range(sample_n), desc="counting saliency score"))
 
-        # 解压结果
+        # Unzip results
         score_vectors, place_holder_list = zip(*results)
 
-        # 拼接结果
-        GT_EXP = torch.cat(score_vectors, dim=1)
+        # Stack results (N, T, 1)
+        GT_EXP = torch.stack(score_vectors, dim=0)
 
         return GT_EXP
+    
     

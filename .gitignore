@@ -1,14 +1,3 @@
-datasets/*
-txai.egg-info
 **/__pycache__/
 *.pt
-*.png
-*.pkl
-*.pth
-*.tsv
-*.txt
-*.npy
-.vscode
-.ipynb_checkpoints
-*.err
-*.out
+

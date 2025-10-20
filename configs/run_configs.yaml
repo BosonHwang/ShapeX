@@ -1,0 +1,5 @@
+defaults:
+  datasets: mcce,mcch,mtce,mtch,mitecg
+  train: false
+  test: true
+ 

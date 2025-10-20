@@ -1,5 +1,5 @@
 import torch
-from shapelet_encoder.models import ProtoPTST
+from shapelet_encoder.models import ProtoPTST, Transformer
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import numpy as np
@@ -8,6 +8,9 @@ import os
 
 from matplotlib import pyplot as plt
 from sklearn.metrics import auc, average_precision_score, precision_recall_curve
+from txai.models.encoders.simple import CNN, LSTM
+
+from txai.models.encoders.transformer_simple import TransformerMVTS
 
 def find_project_root(current_dir, marker=".git"):
     # 循环查找父目录，直到找到标记文件或目录
@@ -18,6 +21,57 @@ def find_project_root(current_dir, marker=".git"):
     return None
 
 
+def load_TimeX_model_structure(explainer_name):
+    # get the timex and timex++ model
+    
+    
+    if explainer_name == 'timex':
+        from txai.models.bc_model4 import TimeXModel, AblationParameters, transformer_default_args
+        from txai.trainers.train_mv4_consistency import train_mv6_consistency
+        print("####################################### load timex #######################################")
+        
+        
+    elif explainer_name == 'timex++':
+        from txai.models.bc_model4 import TimeXModel, AblationParameters, transformer_default_args ### !!!
+        from txai.trainers.train_mv6_consistency import train_mv6_consistency
+    
+    return TimeXModel, AblationParameters, transformer_default_args, train_mv6_consistency
+
+
+def load_class_model(args,X,if_load_pretrained=False):
+    
+    args.class_model_type = args.classifier_model
+
+
+    if args.class_model_type=="cnn":
+        class_model = CNN(
+        d_inp = X[0].shape[-1],
+        n_classes = args.num_classes,)
+        
+    elif args.class_model_type=="lstm":
+            class_model = LSTM(
+        d_inp = X[0].shape[-1],
+        n_classes = args.num_classes,
+    )
+            
+    else:
+        class_model=TransformerMVTS(
+                d_inp = X.shape[-1],
+                max_len = X.shape[0],
+                nlayers = 1,
+                n_classes = args.num_classes,
+                trans_dim_feedforward = 64,
+                trans_dropout = 0.1,
+                d_pe = 16,
+                stronger_clf_head = False,
+                norm_embedding = True,
+                    )
+        
+    if if_load_pretrained: # only cnn model can be loaded
+        class_model.load_state_dict(torch.load(f"/home/hbs/TS/XTS/ShapeX/checkpoints/classifier/{args.dataset_name}_cnn.pt"))
+    return class_model
+
+
 class EarlyStopping:
     def __init__(self, patience=7, verbose=False, delta=0.0):
         self.patience = patience
@@ -25,7 +79,7 @@ class EarlyStopping:
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        self.val_loss_min = np.Inf
+        self.val_loss_min = np.inf
         self.delta = delta
 
     def __call__(self, val_loss, model, path):
@@ -46,16 +100,25 @@ class EarlyStopping:
     def save_checkpoint(self, val_loss, model, path):
         if self.verbose:
             print(
-                f"Metric score decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...\n"
+                f"Metric score decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model at {path}\n"
             )
-        torch.save(model.state_dict(), path + "/" + "checkpoint.pth")
+        
+        # Treat 'path' as a full file path; ensure parent directory exists
+        dir_path = os.path.dirname(path) if os.path.dirname(path) else "."
+        os.makedirs(dir_path, exist_ok=True)
+        
+        # Save directly to the given file path
+        torch.save(model.state_dict(), path)
+        
         self.val_loss_min = val_loss
+        
+        
 class Exp_Basic(object):
     def __init__(self, args):
         self.args = args
         self.model_dict = {
             "Autoformer": Autoformer,
-            "Crossformer": Crossformer,
+            "Crossformer": Transformer,
             "FEDformer": FEDformer,
             "Informer": Informer,
             "iTransformer": iTransformer,
@@ -100,6 +163,8 @@ class Exp_Basic(object):
 
 def plot_visualize_some(X,generated_exps,gt_exps,times,y,choice,saving_path,place_holder_1=None,if_norm=False,mo_s=None):
     
+    # Ensure the saving directory exists
+    os.makedirs(saving_path, exist_ok=True)
 
     # Pick out with each label:
     #uni = torch.unique(y).numpy()
@@ -142,13 +207,15 @@ def plot_visualize_some(X,generated_exps,gt_exps,times,y,choice,saving_path,plac
                 ax1.fill_between([plot_x[i] - 0.45, plot_x[i] + 0.45], -10, 10, color='blue', alpha=abs(highlight_y[i]-np.mean(highlight_y)))
             else:
             #plt.fill_between([plot_x[i] - 0.45, plot_x[i] + 0.45], -10, 10, color='blue', alpha=abs(highlight_y[i]-np.mean(highlight_y))*10)  #for TimeX S2C
-                ax1.fill_between([plot_x[i] - 0.45, plot_x[i] + 0.45], -10, 10, color='blue', alpha=abs(highlight_y[i]))
+                # Ensure alpha value is within 0-1 range
+                alpha_val = min(abs(highlight_y[i]), 1.0)
+                ax1.fill_between([plot_x[i] - 0.45, plot_x[i] + 0.45], -10, 10, color='blue', alpha=alpha_val)
                 pass
         #real exps:
         highlight_r_y=gt_exps_c[:,0]
-        for j in range(len(highlight_y)):
+        for j in range(len(highlight_r_y)):
              
-            ax1.fill_between([plot_x[j] - 0.45, plot_x[j] + 0.45], -3, 3, color='red', alpha=highlight_r_y[j])   
+            ax1.fill_between([plot_x[j] - 0.45, plot_x[j] + 0.45], -3, 3, color='red', alpha=highlight_r_y[j])
         
         
         #plt.plot(times[:,choice], mo_s[0])    

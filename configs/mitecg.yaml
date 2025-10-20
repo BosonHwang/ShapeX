@@ -1,0 +1,15 @@
+base:
+  root_dir: /home/gbsguest/Research/boson/TS/XTS/ShapeX-beta
+
+dataset:
+  name: mitecg
+  meta_dataset: default
+
+mitecg:
+  num_classes: 2
+  seq_len: 360
+  proto_len: 30
+  num_prototypes: 4
+
+
+

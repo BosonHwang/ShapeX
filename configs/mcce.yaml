@@ -1,0 +1,14 @@
+base:
+  root_dir: /home/gbsguest/Research/boson/TS/XTS/ShapeX-beta
+
+dataset:
+  name: mcce
+  meta_dataset: default
+
+mcce:
+  num_classes: 2
+  seq_len: 1400  # aligned with original freqshape split 301
+  proto_len: 100
+  num_prototypes: 2
+
+

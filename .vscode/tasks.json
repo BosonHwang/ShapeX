@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "修复类别不匹配问题",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "-c",
+                "import sys; sys.path.append('.'); from tools.fix_model import fix_class_mismatch; fix_class_mismatch()"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        }
+    ]
+} 
