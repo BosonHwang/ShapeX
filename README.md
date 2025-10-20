@@ -5,10 +5,14 @@
 # ShapeX: Shapelet-Driven Post Hoc Explanations for Time Series Classification Models</b></h2>
 
 <p>
-  <img src="https://img.shields.io/github/last-commit/bosonghuang/ShapeX-beta?color=green" />
-  <img src="https://img.shields.io/github/stars/bosonghuang/ShapeX-beta?color=yellow" />
-  <img src="https://img.shields.io/github/forks/bosonghuang/ShapeX-beta?color=lightblue" />
+  <img src="https://img.shields.io/github/last-commit/BosonHwang/ShapeX?color=green" />
+  <img src="https://img.shields.io/github/stars/BosonHwang/ShapeX?color=yellow" />
+  <img src="https://img.shields.io/github/forks/BosonHwang/ShapeX?color=lightblue" />
   <img src="https://img.shields.io/badge/PRs-Welcome-green" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/BosonHwang/ShapeX">GitHub Repository</a>
 </p>
 
 </div>
