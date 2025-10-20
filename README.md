@@ -165,7 +165,22 @@ python runner.py
 ```
 *(Make sure to set train/test flags inside `configs/run_configs.yaml`.)*
 
+---
 
+### 🧠 Pretrained Models and Checkpoints
+
+Pretrained models, and datasets for **ShapeX** are hosted on **Hugging Face**:  
+👉 [https://huggingface.co/datasets/bosonhwang/ShapeX](https://huggingface.co/datasets/bosonhwang/ShapeX)
+
+This repository includes:
+- 🔹 **Datasets** used in our experiments (`datasets/`)
+- 🔹 **Pretrained classifiers** and **ShapeX explainers** (`checkpoints/`)
+
+You can download or directly load them via the `huggingface_hub` API:
+```python
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id="bosonhwang/ShapeX", repo_type="dataset")
+```
 ---
 
 ## 📚 Citation
