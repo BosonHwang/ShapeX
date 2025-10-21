@@ -11,14 +11,23 @@
   <img src="https://img.shields.io/badge/PRs-Welcome-green" />
 </p>
 
-<p align="center">
-  <a href="https://github.com/BosonHwang/ShapeX">GitHub Repository</a>
-</p>
+
 
 </div>
 
-> 🧠 **ShapeX** is a **shapelet-driven post hoc explainability framework** for time series classification models.  
-> ⚙️ It reveals **interpretable temporal motifs** learned by deep neural networks, providing **segment-level** and **prototype-level** explanations.
+ **ShapeX** is a **shapelet-driven post hoc explainability framework** for time series classification models.  It reveals **interpretable temporal motifs** learned by deep neural networks, providing **segment-level** and **prototype-level** explanations.
+
+
+- [🗞️ Updates / News](#️-updates--news)
+- [💫 Introduction](#-introduction)
+- [🧩 Code Structure](#-code-structure)
+- [⚙️ Installation](#️-installation)
+- [📂 Paths and Directory Setup](#-paths-and-directory-setup)
+- [📊 Datasets](#-datasets)
+- [⚡ Configuration and Execution](#-configuration-and-execution)
+- [🧠 Pretrained Models and Checkpoints](#-pretrained-models-and-checkpoints)
+- [📚 Citation](#-citation)
+
 
 ---
 
