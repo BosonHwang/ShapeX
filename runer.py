@@ -5,7 +5,7 @@ from exp_saliency_general import ShapeXPipline
 from txai.synth_data.synth_data_base import SynthTrainDataset
 
 
-SHAPEX_BETA_ROOT = "/home/gbsguest/Research/boson/TS/XTS/ShapeX-beta"
+SHAPEX_BETA_ROOT = "your_root_path/ShapeX"
 
 
 def build_config(dataset_name: str, num_classes: int = 4, seq_len: int = 500, proto_len: int = 30):

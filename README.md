@@ -64,7 +64,7 @@ It explains *why* a model makes a prediction by **discovering, describing, and a
 ## 🧩 Code Structure
 
 ```
-ShapeX-beta
+ShapeX
 ├─ runner.py
 ├─ requirements.txt
 ├─ configs/
@@ -116,7 +116,7 @@ Classifier checkpoints: <root_dir>/checkpoints/classification_models
 
 If you add a new classifier, place it here:
 ```
-your_root_path/ShapeX-beta/checkpoints/classification_models
+your_root_path/ShapeX/checkpoints/classification_models
 ```
 and follow the naming convention:
 ```
@@ -129,7 +129,7 @@ mcce_transformer.pt, mitecg_transformer.pt, etc.
 
 All datasets should be placed under:
 ```
-your_root_path/ShapeX-beta/datasets
+your_root_path/ShapeX/datasets
 ```
 
 **Supported datasets and expected layouts**
@@ -155,7 +155,7 @@ your_root_path/ShapeX-beta/datasets
 
 Configs are located under:
 ```
-ShapeX-beta/configs/
+ShapeX/configs/
 ```
 - `run_configs.yaml`: datasets list and train/test flags  
 - Per-dataset YAMLs define:
